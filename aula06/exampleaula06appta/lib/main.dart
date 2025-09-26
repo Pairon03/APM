@@ -4,6 +4,8 @@ import 'package:appaula06deliveryta/ui/widgets/bag_provider.dart';
 import 'package:appaula06deliveryta/ui/widgets/splash/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:appaula06deliveryta/data/drink_data.dart';
+
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized(); // serve para carregar a tela do app sem ficar esperando o provider ou banco de dados ser carregado
@@ -11,14 +13,14 @@ void main() async{
   await restaurantData.getRestaurant();
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (context){
-          return RestaurantData();
-        }),
-        ChangeNotifierProvider(create: (context)=>BagProvider())
-      ],
-      child: MyApp(),
-      ));
+  providers: [
+    ChangeNotifierProvider(create: (context) => RestaurantData()),
+    ChangeNotifierProvider(create: (context) => BagProvider()),
+    ChangeNotifierProvider(create: (context) => DrinkData()), 
+  ],
+  child: const MyApp(),
+)
+  );
     
     
 }
