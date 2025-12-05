@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:somativamobilecaua/models/produto.dart';
 import 'package:somativamobilecaua/providers/bag_provider.dart';
 import 'package:somativamobilecaua/screens/confirmacao_pedido_screen.dart';
-import 'package:somativamobilecaua/services/viacep_service.dart'; // Você criará este service
+import 'package:somativamobilecaua/services/viacep_service.dart';
 
 class CarrinhoScreen extends StatefulWidget {
   const CarrinhoScreen({super.key});
@@ -16,17 +16,52 @@ class _CarrinhoScreenState extends State<CarrinhoScreen> {
   final TextEditingController _cepController = TextEditingController();
   final ViaCepService _cepService = ViaCepService();
 
+  // IP REAL DO HOST (para carregar imagens do carrinho)
+  static const String _hostIp = '10.109.83.16'; 
+
   @override
   void initState() {
     super.initState();
-    // Preenche o CEP se já tiver um no provider
     final bagProvider = Provider.of<BagProvider>(context, listen: false);
     _cepController.text = bagProvider.cep;
   }
 
-  // Função para buscar o endereço e calcular o frete (Requisito D)
+  // 🚨 NOVO: Função para confirmar e limpar o carrinho
+  void _confirmAndClearCart(BagProvider provider) {
+    if (provider.itens.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Limpar Carrinho?'),
+          content: const Text('Tem certeza que deseja remover todos os itens?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('CANCELAR'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('LIMPAR', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                provider.clearBag(); // Chama o método de limpeza
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('Carrinho limpo com sucesso!'), duration: Duration(seconds: 2))
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Função para buscar o endereço e calcular o frete (Mantida)
   Future<void> _buscarCep(BagProvider provider) async {
-    final cep = _cepController.text.replaceAll('-', '');
+    final cep = _cepController.text.replaceAll('-', '').trim();
     if (cep.length != 8) {
       _showErrorDialog("O CEP deve ter 8 dígitos.");
       return;
@@ -36,18 +71,17 @@ class _CarrinhoScreenState extends State<CarrinhoScreen> {
       final endereco = await _cepService.fetchAddress(cep);
 
       if (endereco != null) {
-        // Atualiza o endereço e recalcula o frete no provider
         provider.setEndereco(cep, 
           '${endereco['logradouro']}, ${endereco['bairro']} - ${endereco['localidade']}/${endereco['uf']}'
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Endereço obtido e frete calculado!"), duration: Duration(seconds: 1)));
+          const SnackBar(content: Text("Endereço obtido e frete calculado!"), duration: Duration(seconds: 2)));
       } else {
         _showErrorDialog("CEP não encontrado ou inválido.");
         provider.setEndereco(cep, 'CEP não encontrado.');
       }
     } catch (e) {
-      _showErrorDialog("Erro ao buscar CEP: Verifique sua conexão.");
+      _showErrorDialog("Erro ao buscar CEP. Verifique sua conexão.");
       provider.setEndereco(cep, 'Erro na busca do CEP.');
     }
   }
@@ -71,34 +105,69 @@ class _CarrinhoScreenState extends State<CarrinhoScreen> {
       appBar: AppBar(
         title: const Text('Seu Carrinho'),
         backgroundColor: Colors.red,
+        actions: [
+          Consumer<BagProvider>(
+            builder: (context, provider, child) {
+              return IconButton(
+                icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                onPressed: provider.itens.isEmpty ? null : () => _confirmAndClearCart(provider),
+                tooltip: 'Limpar todos os itens',
+              );
+            },
+          ),
+        ],
       ),
       body: Consumer<BagProvider>(
         builder: (context, bagProvider, child) {
           return Column(
             children: [
-              // Lista de Itens no Carrinho
+              // Lista de Itens no Carrinho (AGRUPADA)
               Expanded(
                 child: bagProvider.itens.isEmpty
                     ? const Center(child: Text("Seu carrinho está vazio."))
                     : ListView.builder(
-                        itemCount: bagProvider.itens.length,
+                        itemCount: bagProvider.itens.length, // Lista de produtos únicos
                         itemBuilder: (context, index) {
-                          final item = bagProvider.itens[index];
+                          final produto = bagProvider.itens[index];
+                          final quantidade = bagProvider.getQuantidade(produto);
+                          final subTotalItem = produto.preco * quantidade;
+                          
+                          // URL da Imagem (usando o IP real do host para Mídia)
+                          final imageUrl = produto.imagemUrl != null 
+                              ? 'http://10.109.83.16:8000/media/${produto.imagemUrl!}' 
+                              : null;
+
                           return ListTile(
-                            title: Text(item.nome),
-                            subtitle: Text("R\$ ${item.preco.toStringAsFixed(2)}"),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.remove_circle, color: Colors.red),
-                              onPressed: () => bagProvider.removerItem(item), // Remove Item (Requisito D)
+                            leading: imageUrl != null
+                                ? Image.network(imageUrl, width: 40, height: 40, fit: BoxFit.cover)
+                                : const Icon(Icons.fastfood, color: Colors.grey),
+                            title: Text('${produto.nome} (x$quantidade)'), // Item + Contador
+                            subtitle: Text("Total do Item: R\$ ${subTotalItem.toStringAsFixed(2)}"),
+                            
+                            // Botões de Controle de Quantidade
+                            trailing: Row( 
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Botão Remover
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => bagProvider.removerItem(produto),
+                                ),
+                                // Botão Adicionar
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                  onPressed: () => bagProvider.adicionarItem(produto),
+                                ),
+                              ],
                             ),
                           );
                         },
-                      ),
+                    ),
               ),
 
               const Divider(thickness: 2),
 
-              // Campo CEP e Endereço (Requisito D)
+              // Campo CEP e Endereço (Mantido)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -134,7 +203,7 @@ class _CarrinhoScreenState extends State<CarrinhoScreen> {
 
               const Divider(thickness: 2),
               
-              // Totais e Botão de Confirmação
+              // Totais e Botão de Confirmação (Mantido)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -152,7 +221,7 @@ class _CarrinhoScreenState extends State<CarrinhoScreen> {
                       children: [
                         const Text('TOTAL GERAL:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         Text('R\$ ${bagProvider.totalGeral.toStringAsFixed(2)}', 
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red)),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red)),
                       ],
                     ),
                     const SizedBox(height: 15),
