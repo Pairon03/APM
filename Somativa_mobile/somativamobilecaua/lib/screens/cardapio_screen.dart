@@ -34,27 +34,28 @@ class _CardapioScreenState extends State<CardapioScreen> {
         final List<dynamic> data = json.decode(response.body);
         
         setState(() {
-          // Usando função lambda com corpo para evitar erros de sintaxe
+          // CORREÇÃO APLICADA: Mapeamento explícito de todos os campos
           _produtos = data.map((json) {
             final precoDouble = double.parse(json['preco']); 
             
             return Produto.fromJson({
-              ...json, 
-              'preco': precoDouble // Passa o valor já como double
+              'id': json['id'].toString(),
+              'nome': json['nome'] as String,
+              'descricao': json['descricao'] as String,
+              'preco': precoDouble,
+              'categoria': json['categoria'] as String,
+              'imagem': json['imagem'], // Caminho da imagem
             });
           }).toList();
           _isLoading = false;
         });
       } else {
-        // Se a API retornar um status diferente de 200
         throw Exception('Falha ao carregar produtos: ${response.statusCode}');
       }
     } catch (e) {
-      // Se houver erro de rede/conexão
       print('Erro ao buscar produtos: $e');
       setState(() {
         _isLoading = false;
-        // Adicionar tratamento visual de erro aqui, se necessário
       });
     }
   }
@@ -90,15 +91,15 @@ class _CardapioScreenState extends State<CardapioScreen> {
               ),
               if (bagProvider.itens.isNotEmpty)
                 Positioned(
-                   right: 8,
-                   top: 8,
-                   child: Container(
-                     padding: const EdgeInsets.all(2),
-                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                     constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                     child: Text('${bagProvider.itens.length}', style: const TextStyle(color: Colors.red, fontSize: 10)),
-                   ),
-                 )
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text('${bagProvider.itens.length}', style: const TextStyle(color: Colors.red, fontSize: 10)),
+                  ),
+                )
             ],
           ),
         ],
@@ -128,7 +129,7 @@ class _CardapioScreenState extends State<CardapioScreen> {
                     itemBuilder: (context, index) {
                       final produto = produtosFiltrados[index];
                       
-                      // CORREÇÃO: Usando ! (non-null assertion) na interpolação
+                      // Montagem da URL completa para a imagem
                       final imageUrl = produto.imagemUrl != null 
                           ? 'http://10.0.2.2:8000${produto.imagemUrl!}' 
                           : null; 
@@ -137,7 +138,7 @@ class _CardapioScreenState extends State<CardapioScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         elevation: 2,
                         child: ListTile(
-                          // Exibir Imagem se houver
+                          // Exibir Imagem se houver (leading)
                           leading: imageUrl != null
                               ? Image.network(
                                   imageUrl,

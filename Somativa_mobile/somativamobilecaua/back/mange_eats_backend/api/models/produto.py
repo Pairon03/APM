@@ -10,5 +10,7 @@ class Produto(models.Model):
         ('lanche', 'Lanche'),
     ])
 
+    imagem = models.ImageField(upload_to='produtos/', null=True, blank=True) 
+
     def __str__(self):
         return self.nome

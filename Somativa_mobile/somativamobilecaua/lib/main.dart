@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.red,
         useMaterial3: true,
       ),
-      home: const Login(), // A tela de Login é a tela inicial (Requisito A)
+      home: const Login(), 
     );
   }
 }
